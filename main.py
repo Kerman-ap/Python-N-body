@@ -52,23 +52,29 @@ class quadtree:
     def insert(self, point):
         
         buildtime = pygame.time.get_ticks()
-        if len(self.points) < 1:
+        if len(self.points) < 1 and not self.divided: #if nothing else is in the box (no subdivision required)
             self.points.append(point)
         else:
             if not self.divided:
                 self.subdivide()
-            x = point[0] > self.boundary.x
-            y = point[1] > self.boundary.y
-            if y:
-                if x:
-                    self.ne.insert(point)
+            self.points.append(point)
+            for point in self.points:
+                x = point[0] > self.boundary.x
+                y = point[1] > self.boundary.y
+                #insert based on position of point
+                if y:
+                    if x:
+                        self.ne.insert(point)
+                    else:
+                        self.nw.insert(point)
                 else:
-                    self.nw.insert(point)
-            else:
-                if x:
-                    self.se.insert(point)
-                else:
-                    self.sw.insert(point)
+                    if x:
+                        self.se.insert(point)
+                    else:
+                        self.sw.insert(point)
+            self.points = []
+                    
+
         if pygame.time.get_ticks() - buildtime > 1:
             global lagger
             print(pygame.time.get_ticks() - buildtime)
@@ -208,7 +214,7 @@ def normalize(point):
     y = round(point[1] / scale + HEIGHT / 2)
     return((x, y))
 
-galaxy(50, 250)
+galaxy(20000, 250)
 
 def draw():
     WIN.fill((0, 0, 0))
