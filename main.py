@@ -4,13 +4,13 @@ import math
 import random
 import pickle
 import colorsys
-
+import logging
 
 WIDTH, HEIGHT = 1280, 720
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption('N Body Simulation')
 pygame.init()
-FPS = 240
+FPS = 9999
 WHITE = (255, 255, 255)
 STEPSIZE = 0.1
 objects = []
@@ -23,16 +23,19 @@ scale = 1
 lastmax = 10
 recentmax = []
 lagger = (0, 0)
+paths = []
 
 for i in range(25):
     recentmax.append(10)
 
 class quadtree:
-    def __init__(self, iboundary):
+    def __init__(self, iboundary, path):
         self.boundary = iboundary
         self.points = []
         self.divided = False
-    
+        self.com = (0, 0, 0)
+        self.path = path.copy()
+        
     def subdivide(self):
         x = self.boundary.x
         y = self.boundary.y
@@ -40,17 +43,25 @@ class quadtree:
         h = self.boundary.h
         
         nw = rect(x - w/4, y + h/4, w/2, h/2)
-        self.nw = quadtree(nw)
-        ne = rect(x + w/4, y + h/4, w/2, h/2)
-        self.ne = quadtree(ne)
+        self.path.append('nw')
+        self.nw = quadtree(nw, self.path)
+        ne = rect(x + w/4, y + h/4, w/2, h/2)   
+        self.path[-1] = 'ne'
+        self.ne = quadtree(ne, self.path)
         sw = rect(x - w/4, y - h/4, w/2, h/2)
-        self.sw = quadtree(sw)
+        self.path[-1] = 'sw'
+        self.sw = quadtree(sw, self.path)
         se = rect(x + w/4, y - h/4, w/2, h/2)
-        self.se = quadtree(se)
+        self.path[-1] = 'se'
+        self.se = quadtree(se, self.path)
+        self.path.pop()
         self.divided = True
+
         
     def insert(self, point):
-        
+        self.getroot()
+        totmass = self.com[0] + point[0]
+        self.com = (totmass, point[1] * point[0] + self.com[1] * self.com[0] / totmass, point[2] * point[0] + self.com[2] * self.com[0] / totmass)
         buildtime = pygame.time.get_ticks()
         if len(self.points) < 1 and not self.divided: #if nothing else is in the box (no subdivision required)
             self.points.append(point)
@@ -58,9 +69,10 @@ class quadtree:
             if not self.divided:
                 self.subdivide()
             self.points.append(point)
-            for point in self.points:
-                x = point[0] > self.boundary.x
-                y = point[1] > self.boundary.y
+            while self.points:
+                point = self.points.pop()
+                x = point[1] > self.boundary.x
+                y = point[2] > self.boundary.y
                 #insert based on position of point
                 if y:
                     if x:
@@ -72,13 +84,20 @@ class quadtree:
                         self.se.insert(point)
                     else:
                         self.sw.insert(point)
-            self.points = []
-                    
-
+        if self.points:
+            if not self.path in paths:
+                paths.append(self.path)
+                self.pathpos = len(paths)
+            else:
+                paths[self.pathpos][0] = 'point'
+        else:
+            if self.path in paths:
+                paths[self.pathpos][0] = None
+            
+        
+        
         if pygame.time.get_ticks() - buildtime > 1:
             global lagger
-            print(pygame.time.get_ticks() - buildtime)
-            print(point)
             lagger = point
 
     
@@ -99,7 +118,9 @@ class quadtree:
             if max(divmax) > maxiter:
                 maxiter = max(divmax)
         return maxiter
-            
+    
+    def getroot(self):
+        return tree            
 
             
             
@@ -142,14 +163,21 @@ def findcom():
     return com
 
 def buildtree():
+    global paths
     size = findsize()
     bounds = rect(0, 0, size * 2, size * 2)
     global tree
-    tree = quadtree(bounds)
+    tree = quadtree(bounds, ['point'])
 
     for i in objects:
-        point = (i[1], i[2])
+        point = (i[0], i[1], i[2])
         tree.insert(point)
+    for i, item in enumerate(paths):
+        if item[0] == None:
+            paths.pop(i)
+        else:
+            print(paths[i])
+    paths = []
 
 def mean(list):
     return sum(list)/len(list)
@@ -214,7 +242,7 @@ def normalize(point):
     y = round(point[1] / scale + HEIGHT / 2)
     return((x, y))
 
-galaxy(20000, 250)
+galaxy(100, 250)
 
 def draw():
     WIN.fill((0, 0, 0))
@@ -232,6 +260,8 @@ def draw():
 
 
 def main():
+    fmt = '[%(levelname)s] - %(message)s'
+    logging.basicConfig(level=logging.DEBUG, format=fmt)
     n = 0
     if reviewing:
         with open("save.txt", "rb") as fp:
@@ -254,7 +284,6 @@ def main():
             if Buildtree:
                 treetime = pygame.time.get_ticks()
                 buildtree()
-                print('tree time:' + str(pygame.time.get_ticks() - treetime))
         else:
             iterate()
         draw()
