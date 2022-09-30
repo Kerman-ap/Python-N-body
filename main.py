@@ -5,6 +5,8 @@ import random
 import pickle
 import colorsys
 import logging
+from numba import jit, njit
+import numpy as np
 
 WIDTH, HEIGHT = 1280, 720
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -84,15 +86,11 @@ class quadtree:
                         self.se.insert(point)
                     else:
                         self.sw.insert(point)
-        if self.points:
-            if not self.path in paths:
-                paths.append(self.path)
-                self.pathpos = len(paths)
-            else:
-                paths[self.pathpos][0] = 'point'
+        if self.points and not self.path in paths:
+            paths.append(self.path)
+            self.pathpos = len(paths)
         else:
-            if self.path in paths:
-                paths[self.pathpos][0] = None
+            paths[self.pathpos][0] = None
             
         
         
@@ -148,7 +146,7 @@ def save(list):
         pickle.dump(list, fp)
 
 
-def calcmove():
+def calcmoves():
     for indx, i in enumerate(objects):
         temp = list(objects[indx])
         temp[1] = i[1] + i[3] * STEPSIZE
@@ -225,7 +223,10 @@ def iterate():
     temp = []
     for i in objects:
         temp.append(i)
-    recording.append(temp)
+
+    
+jit_iterate = njit()(iterate)
+calcmove = calcmoves
 
 def gensquare(number, x, y):
     root = int(math.floor(math.sqrt(number)))
@@ -250,7 +251,7 @@ def draw():
     if Drawtree:
         drawquad()
     for i in objects:
-        pygame.draw.circle(WIN, (0, 255, 0), (round(lagger[0]) / scale + WIDTH / 2, round(lagger[1]) / scale + HEIGHT / 2), 5)
+        #pygame.draw.circle(WIN, (0, 255, 0), (round(lagger[0]) / scale + WIDTH / 2, round(lagger[1]) / scale + HEIGHT / 2), 5)
         pygame.draw.line(WIN, WHITE, ((i[1]) / scale + WIDTH / 2, (i[2]) / scale + HEIGHT / 2), ((i[1] - i[3] * STEPSIZE ** 2) / scale + WIDTH / 2, (i[2] - i[4] * STEPSIZE ** 2) / scale + HEIGHT / 2), 1)
     
     textsurface = GAME_FONT.render(str(int(clock.get_fps())), False, (255, 255, 255))
