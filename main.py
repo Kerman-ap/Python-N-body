@@ -19,27 +19,18 @@ def galaxy(n):
 def getcenterofmass(objects):
     x = 0
     y = 0
-    for i in objects:
-        x += i.x 
-        y += i.y
+    for object in objects:
+        x += object.x 
+        y += object.y
     return (x/len(objects), y/len(objects))
 
-class rect:
-    def __init__(self, x, y, width, height):
-        self.x = x
-        self.y = y
-        self.width = width
-        self.height = height
-        
-    def contains(self, point):
-        return(point[0] > self.x - self.width / 2 and point[0] < self.x + self.width / 2 and point[1] < self.y + self.height / 2 and point[1] > self.y - self.height / 2)
-    
 class quadtree():
-    def __init__(self, boundary):
+    def __init__(self, boundary, parent):
         self.boundary = boundary
         self.divided = False
         self.centerofmass = (0, 0)
         self.objects = []
+        self.parent = parent
         
     def subdivide(self):
         x = self.boundary.x
@@ -49,22 +40,22 @@ class quadtree():
         
         # Create subtrees for each quadrant 
         nw = rect(x - width/4, y + height/4, width/2, width/2)
-        self.nw = quadtree(nw)
+        self.nw = quadtree(nw, self)
         ne = rect(x + width/4, y + height/4, width/2, width/2)
-        self.ne = quadtree(ne)
+        self.ne = quadtree(ne, self)
         sw = rect(x - width/4, y - height/4, width/2, width/2)
-        self.sw = quadtree(sw)
+        self.sw = quadtree(sw, self)
         se = rect(x + width/4, y - height/4, width/2, width/2)
-        self.se = quadtree(se)
+        self.se = quadtree(se, self)
         
         self.divided = True # Mark as divided
         
     def insert(self, object):
         if len(self.objects) < 1 and not self.divided: # If box is already empty (no subdivision needed)
-            self.objects.append(object)
+            self.objects.append(object)   
         else:
             if not self.divided:
-                self.subdivide() #Subdivide if not already
+                self.subdivide()
             self.objects.append(object)
             while self.objects: #Put all objects in node into children
                 object = self.objects.pop()
@@ -101,7 +92,16 @@ class quadtree():
         return maxiter
 
 
-
+class rect:
+    def __init__(self, x, y, width, height):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        
+    def contains(self, point):
+        return(point[0] > self.x - self.width / 2 and point[0] < self.x + self.width / 2 and point[1] < self.y + self.height / 2 and point[1] > self.y - self.height / 2)
+    
 class object():
     def __init__(self, x, y, xvel, yvel, mass):
       self.x = x
@@ -111,12 +111,11 @@ class object():
       self.mass = mass
 
 
-
 def buildtree(objects):
     boundary = findrect(objects)
     rectboundary = rect(boundary[0], boundary[1], boundary[2], boundary[3])
     global tree
-    tree = quadtree(rectboundary)
+    tree = quadtree(rectboundary, None)
     for object in objects:
         tree.insert(object)
     
@@ -128,7 +127,7 @@ def findrect(objects):
     for i in objects:
         length.append(i.x)
         length.append(i.y)
-    size = math.ceil((max(length) + abs(min(length)))/32)*32
+    size = math.ceil((max(length) + abs(min(length)))/128)*128
     return (min(length) + max(length))/2, (min(length) + max(length))/2, size, size
       
 def dist(x1, y1, x2, y2):
@@ -150,7 +149,7 @@ def moveobjects(objects):
 def draw(objects):
     centerofmass = 0, 0 
     WIN.fill((0, 0, 0))
-    #tree.drawtree(0, 1)
+    tree.drawtree(0, 1)
     for i in objects:
         if i.x + WIDTH/2 - centerofmass[0] > 0 and i.x + WIDTH/2 - centerofmass[0] < WIDTH and i.y + HEIGHT/2 - centerofmass[1] > 0 and i.y + HEIGHT/2 - centerofmass[1] < HEIGHT: # If point is in window
             pygame.draw.circle(WIN, (255, 255, 255), (i.x + WIDTH/2 - centerofmass[0], i.y + HEIGHT/2 - centerofmass[1]), 1)
@@ -165,7 +164,7 @@ def main():
     global clock
     clock = pygame.time.Clock()
     while run: 
-        #buildtree(objects)
+        buildtree(objects)
         draw(objects)
         clock.tick(FPS)
         iterate(objects)
